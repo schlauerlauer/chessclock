@@ -24,22 +24,23 @@ binary_sensor:
     number: GPIO5
     mode: INPUT_PULLUP
     inverted: yes
+  internal: true
   name: "Chess Toggle"
   id: p_switch
   on_press:
     then:
     - script.stop: dimmdown
     - lambda: |-
-        if (!id(settings)) {
-          if (id(playing)) {
-            id(player) = !id(player);
+        if (!id(settings).state) {
+          if (id(playing).state) {
+            id(player).toggle();
           } else {
-            if (!id(started)) id(player) = !id(player);
+            if (!id(started)) id(player).toggle();
             id(bright) = 10;
             id(indicator) = true;
           }
         } else {
-          if (!id(alarmsetting)) {
+          if (!id(alarmsetting).state) {
             int _val = id(p1);
             if (_val > 108000) {
               _val = 0;
@@ -50,17 +51,21 @@ binary_sensor:
           }
         }
         id(ring).turn_on();
-        if (id(alarmsetting)) {
-          id(alarminc) = true;
+        if (id(alarmsetting).state) {
+          id(alarminc).turn_on();
         }
     - component.update: segments
-    - delay: !lambda "if (id(playing)) return 0; else return 1000;"
+    - delay: !lambda "if (id(playing).state) return 0; else return 1000;"
     - lambda: |-
-        if (!id(playing)) {
+        if (!id(playing).state) {
           id(bright) = 3;
           id(indicator) = false;
         }
-    - script.execute: dimmdown
+    - if:
+        condition:
+        - switch.is_off: playing
+        then:
+        - script.execute: dimmdown
     - if:
         condition:
           rtttl.is_playing
@@ -70,76 +75,207 @@ binary_sensor:
   on_release:
     then:
     - lambda: |-
-        id(alarminc) = false;
+        id(alarminc).turn_off();
     
   on_double_click:
     then:
-    - script.stop: dimmdown
     - lambda: |-
-        if (!id(settings)) {
+        if (!id(settings).state) {
           if (!id(started)) {
             id(p1) = id(preset);
             id(p2) = id(preset);
           }
-          if (id(playing)) {
+          if (id(playing).state) {
             id(countdown) = false;
-            id(playing) = false;
+            id(playing).turn_off();
             id(bright) = 3;
           } else {
             id(countdown) = true;
             id(started) = true;
+            id(ginprogress).publish_state(1);
             id(bright) = 10;
             id(indicator) = true;
           }
         } else {
-          if (!id(alarmsetting)) {
+          if (!id(alarmsetting).state) {
             id(p1) -= id(increment) * 2;
             id(p2) -= id(increment) * 2;
           }
-          id(alarmsetting) = !id(alarmsetting);
+          id(alarmsetting).toggle();
         }
   on_click:
   - min_length: 1s
     max_length: 4s
     then:
-    - lambda: |-
-        if (id(started)) {
-          id(playing) = false;
-          id(started) = false;
-          id(indicator) = false;
-          id(ended) = false;
-          id(p1) = id(preset);
-          id(p2) = id(preset);
-          id(gtimer) = 0;
-          id(bright) = 3;
-          id(songplayed) = false;
-        } else {
-          if (id(settings)) {
-            id(preset) = id(p1) - id(increment);
-          }
-          if (!id(alarmsetting)) {
-            id(p1) = id(preset);
-            id(p2) = id(preset);
-            id(settings) = !id(settings);
-          }
-        }
-        id(player) = !id(player);
+    - if:
+        condition:
+        - lambda: 'return id(started);'
+        then:
+        - script.execute: resetgame
+        else:
+        - lambda: |-
+            if (id(settings).state) {
+              id(preset) = id(p1) - id(increment);
+            }
+            if (!id(alarmsetting).state) {
+              id(p1) = id(preset);
+              id(p2) = id(preset);
+              id(settings).toggle();
+            }
+    - lambda: 'id(player).toggle();'
   - min_length: 4s
     max_length: 7s
     then:
     - if:
         condition:
           lambda: |-
-            return !id(alarmsetting);
+            return !id(alarmsetting).state;
         then:
-        - lambda: 'id(alarm) = !id(alarm);'
+        - switch.toggle: alarm
 
 switch:
 - platform: gpio
   pin: GPIO12
-  name: "Button LED"
+  name: "Button light"
   id: ring
+  icon: "mdi:radiobox-marked"
   restore_mode: ALWAYS_ON
+- platform: template
+  name: "Alarm"
+  id: "alarm"
+  icon: "mdi:alarm"
+  restore_state: yes
+  optimistic: true
+- platform: template
+  name: "Settings"
+  id: "settings"
+  icon: "mdi:cog-outline"
+  restore_state: no
+  optimistic: true
+  turn_on_action:
+  - lambda: |-
+      id(p1) = id(preset);
+      id(p2) = id(preset);
+  turn_off_action:
+  - lambda: |-
+      id(preset) = id(p1);
+  - switch.turn_off: alarmsetting
+- platform: template
+  name: "Setting Alarm"
+  id: "alarmsetting"
+  icon: "mdi:cog-clockwise"
+  restore_state: no
+  optimistic: true
+  turn_on_action:
+  - switch.turn_on: settings
+- platform: template
+  name: "Playing"
+  id: "playing"
+  icon: "mdi:chess-bishop"
+  restore_state: no
+  optimistic: true
+  turn_on_action:
+  - lambda: |-
+      if(!id(started)) {
+        id(p1) = id(preset);
+        id(p2) = id(preset);
+        id(started) = true;
+        id(ginprogress).publish_state(1);
+        id(indicator) = true;
+      }
+      id(bright) = 10;
+  turn_off_action:
+  - lambda: |-
+      if(id(started)) {
+        id(countdown) = false;
+        id(bright) = 3;
+      }
+- platform: template
+  name: "Active player"
+  id: "player"
+  icon: "mdi:swap-horizontal"
+  restore_state: no
+  optimistic: true
+  turn_on_action:
+  - script.execute: showactiveplayer
+  - sensor.template.publish:
+      id: p1sens
+      state: !lambda 'return (id(p1)/600);'
+  turn_off_action:
+  - script.execute: showactiveplayer
+  - sensor.template.publish:
+      id: p2sens
+      state: !lambda 'return (id(p2)/600);'
+- platform: template
+  name: "Alarm increase time"
+  id: "alarminc"
+  icon: "mdi:alarm-plus"
+  restore_state: no
+  optimistic: true
+- platform: template
+  name: "Game increase time"
+  restore_state: no
+  icon: "mdi:checkerboard-plus"
+  turn_on_action:
+  - lambda: |-
+      if (id(settings).state) {
+        if (!id(alarmsetting).state) {
+          int _val = id(p1);
+          if (_val > 108000) {
+            _val = 0;
+          }
+          _val += id(increment);
+          id(p1) = _val;
+          id(p2) = _val;
+        }
+      }
+  - component.update: segments
+- platform: template
+  name: "Game End"
+  icon: "mdi:checkerboard-remove"
+  restore_state: no
+  turn_on_action:
+  - script.execute: resetgame
+
+sensor:
+- platform: template
+  name: "Game in progress"
+  id: "ginprogress"
+  lambda: 'return id(started);'
+  update_interval: 1h
+  icon: "mdi:checkerboard"
+  accuracy_decimals: 0
+- platform: template
+  name: "Time Player 1"
+  id: "p1sens"
+  lambda: 'return (id(p1)/600);'
+  update_interval: 1h
+  icon: "mdi:chevron-left-circle"
+  unit_of_measurement: "m"
+  accuracy_decimals: 0
+- platform: template
+  name: "Time Player 2"
+  id: "p2sens"
+  lambda: 'return (id(p2)/600);'
+  update_interval: 1h
+  icon: "mdi:chevron-right-circle"
+  unit_of_measurement: "m"
+  accuracy_decimals: 0
+- platform: template
+  name: "Time Game"
+  lambda: 'return (id(gtimer)/60);'
+  update_interval: 60s
+  icon: "mdi:camera-timer"
+  unit_of_measurement: "m"
+  accuracy_decimals: 0
+- platform: template
+  name: "Alarm time"
+  lambda: 'return id(alarmhour) + (id(alarmminute) * 0.01);'
+  id: alarmtime
+  update_interval: 1h
+  icon: "mdi:timeline-clock"
+  unit_of_measurement: "h"
+  accuracy_decimals: 2
 
 rtttl:
 - output: buzzer
@@ -151,15 +287,7 @@ output:
   id: buzzer
 
 globals:
-  - id: playing       # Playing (true) or paused (false) # TODO restore playing
-    type: bool
-    restore_value: no
-    initial_value: "false"
-  - id: started       # game in progress (playing or paused) # TODO restore value
-    type: bool
-    restore_value: no
-    initial_value: "false"
-  - id: player        # Active player # TODO backup active player on pause
+  - id: started       # game in progress (playing or paused)
     type: bool
     restore_value: no
     initial_value: "false"
@@ -178,8 +306,8 @@ globals:
   - id: preset        # Initial game time
     type: int
     restore_value: no
-    initial_value: "36000" # in 100ms -> 3600 * 10 = 1h
-  - id: gtimer        # Total game time # TODO restore game time, but don't write to RAM every 100ms, maybe on pause
+    initial_value: "18000" # in 100ms -> 3600 * 10 = 1h
+  - id: gtimer        # Total game time
     type: int
     restore_value: no 
     initial_value: "0"
@@ -191,10 +319,6 @@ globals:
     type: int
     restore_value: no
     initial_value: "1"
-  - id: settings      # Display settings true/false
-    type: bool
-    restore_value: no
-    initial_value: "false"
   - id: increment     # Game time increment
     type: int
     restore_value: no
@@ -203,7 +327,7 @@ globals:
     type: bool
     restore_value: no
     initial_value: "false"
-  - id: cdvalue       # Countdown value # TODO maybe change cdvalue to static instead of global?
+  - id: cdvalue       # Countdown value
     type: int
     restore_value: no
     initial_value: "4"
@@ -215,26 +339,22 @@ globals:
     type: bool
     restore_value: no
     initial_value: "false"
-  - id: alarmsetting  # Alarm setting visible true/false
-    type: bool
-    restore_value: no
-    initial_value: "false"
-  - id: alarminc      # Alarm minute/hour currently increasing true/false
-    type: bool
-    restore_value: no
-    initial_value: "false"
-  - id: alarm         # Alarm enabled true/false
-    type: bool
+  - id: alarmhour
+    type: int
     restore_value: yes
-    initial_value: "false"
-  - id: alarmhour     # Alarm hour setting # TODO Restore alarm hour
+    initial_value: "6"
+  - id: alarmminute
+    type: int
+    restore_value: yes
+    initial_value: "0"
+  - id: alarmhourtmp
     type: int
     restore_value: no
-    initial_value: "16"
-  - id: alarmminute   # Alarm minute setting # TODO Restore alarm minute
+    initial_value: "6"
+  - id: alarmminutetmp
     type: int
     restore_value: no
-    initial_value: "51"
+    initial_value: "0"
   - id: alarmplayed   # Alarm song played true/false
     type: bool
     restore_value: no
@@ -255,7 +375,7 @@ interval:
   - if:
       condition:
         lambda: |-
-          if (id(alarm) && id(sntp_time).now().is_valid()) {
+          if (id(alarm).state && id(sntp_time).now().is_valid()) {
             if (id(sntp_time).now().hour == id(alarmhour)) {
               if (id(sntp_time).now().minute == id(alarmminute)) {
                 if (!id(alarmplayed)) {
@@ -272,18 +392,18 @@ interval:
 - interval: 100ms # Player Timers
   then:
   - lambda: |-
-      if (id(playing)) {
+      if (id(playing).state) {
         int _p1, _p2;
         _p1 = id(p1);
         _p2 = id(p2);
         if (_p1 > 0 && _p2 > 0) {
-          if (id(player)) {
+          if (id(player).state) {
             id(p2) -= 1;
           } else {
             id(p1) -= 1;
           }
         } else {
-          id(playing) = false;
+          id(playing).turn_off();
           id(indicator) = true;
           id(bright) = 15;
           id(ended) = true;
@@ -294,26 +414,38 @@ interval:
       }
   - if:
       condition:
-        lambda: |-
-          return id(alarminc);
+        switch.is_on: alarminc
       then:
       - lambda: |-
-          if (id(alarmminute) < 59) {
-            id(alarmminute) += 1;
+          if (id(alarmminutetmp) < 59) {
+            id(alarmminutetmp) += 1;
           } else {
-            id(alarmminute) = 0;
-            if (id(alarmhour) < 23) {
-              id(alarmhour) += 1;
+            id(alarmminutetmp) = 0;
+            if (id(alarmhourtmp) < 23) {
+              id(alarmhourtmp) += 1;
             } else {
-              id(alarmhour) = 0;
+              id(alarmhourtmp) = 0;
             }
           }
       - component.update: segments
+      else:
+      - if:
+          condition:
+            lambda: |-
+              if (id(settings).state || (id(alarmhourtmp) == id(alarmhour) && id(alarmminutetmp) == id(alarmminute))) {
+                return false;
+              } else return true;
+          then:
+          - lambda: |-
+              id(alarmminute) = id(alarmminutetmp);
+              id(alarmhour) = id(alarmhourtmp);
+              ESP_LOGD("settings", "Updated alarm settings");
+              id(alarmtime).publish_state(id(alarmhourtmp) + (id(alarmminutetmp) * 0.01));
 
 - interval: 1s # Game Timer, Countdown & End of Game Alert
   then:
   - lambda: |-
-      if (id(playing)) {
+      if (id(playing).state) {
         id(gtimer) += 1;
       } else {
         if (id(started)) id(indicator) = !id(indicator);
@@ -326,10 +458,10 @@ interval:
         else {
           id(cdvalue) = 4;
           id(countdown) = false;
-          id(playing) = true;
+          id(playing).turn_on();
         }
       }
-      if (id(started) && id(playing)) id(indicator) = true;
+      if (id(started) && id(playing).state) id(indicator) = true;
       if (id(ended)) {
         if (id(indicator)) {
           id(bright) = 15;
@@ -374,6 +506,36 @@ script:
           if (id(bright) == 1) {
             id(ring).turn_off();
           }
+- id: showactiveplayer
+  then:
+  - lambda: |-
+      if (!id(settings).state) {
+        if (!id(started)) id(player).toggle();
+        id(bright) = 10;
+        id(indicator) = true;
+      }
+  - component.update: segments
+  - delay: !lambda "if (id(playing).state) return 0; else return 1000;"
+  - lambda: |-
+      if (!id(playing).state) {
+        id(bright) = 3;
+        id(indicator) = false;
+      }
+- id: resetgame
+  then:
+  - lambda: |-
+      if (id(started)) {
+        id(playing).turn_off();
+        id(started) = false;
+        id(ginprogress).publish_state(0);
+        id(indicator) = false;
+        id(ended) = false;
+        id(p1) = id(preset);
+        id(p2) = id(preset);
+        id(gtimer) = 0;
+        id(bright) = 3;
+        id(songplayed) = false;
+      }
 
 display:
   - platform: max7219
@@ -384,11 +546,11 @@ display:
       it.set_intensity(id(bright));
       if (id(bright) != 0) {
         if (id(indicator)) {
-          int _pos = id(player) * 7;
+          int _pos = id(player).state * 7;
           it.print(_pos, "-");
         }
-        if (id(alarm)) it.print(7, ".");
-        if (id(started) || (id(settings))) {
+        if (id(alarm).state) it.print(7, ".");
+        if (id(started) || (id(settings).state)) {
           int _s1, _p1s, _p1m, _s2, _p2s, _p2m;
           _s1 = id(p1);
           _p1m = _s1/600;
@@ -397,7 +559,7 @@ display:
           _p2m = _s2/600;
           _p2s = _s2/10-(_p2m*60);
           
-          if (!id(alarmsetting)) {
+          if (!id(alarmsetting).state) {
             if (_p1m < 10) {
               int _p1c = _s1-(_p1m*60+_p1s)*10;
               it.printf(8, "%1d.%02d.%1d", _p1m, _p1s, _p1c);
@@ -413,7 +575,7 @@ display:
             } else it.printf(12, "%02d.%02d", _p2m, _p2s);
           }
 
-          if (!id(settings) && !id(countdown)) {
+          if (!id(settings).state && !id(countdown)) {
             int _g, _gs, _gm, _gh;
             _g = id(gtimer);
             _gh = _g/3600;
@@ -421,14 +583,14 @@ display:
             _gs = _g-(_gh*3600)-(_gm*60);
             it.printf(1,"%02d.%02d.%02d", _gh, _gm, _gs);
           } else if (id(countdown)) {
-            int _pos = 1 + id(player) * 5;
+            int _pos = 1 + id(player).state * 5;
             it.printf(_pos,"%1d", id(cdvalue));
           } else {
-            if (!id(alarmsetting)) {
+            if (!id(alarmsetting).state) {
               it.printf(1, "SCHACH");
             } else {
               it.print(1, "uhr");
-              it.printf(10, "%02d.%02d", id(alarmhour), id(alarmminute));
+              it.printf(10, "%02d.%02d", id(alarmhourtmp), id(alarmminutetmp));
             }
           }
         } else {
