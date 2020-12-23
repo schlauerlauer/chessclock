@@ -150,92 +150,91 @@ output:
   id: buzzer
 
 globals:
-  - id: playing # not paused
+  - id: playing       # Playing (true) or paused (false) # TODO restore playing
     type: bool
     restore_value: no
     initial_value: "false"
-  - id: started # game in progress (playing or paused)
+  - id: started       # game in progress (playing or paused) # TODO restore value
     type: bool
     restore_value: no
     initial_value: "false"
-  - id: player
+  - id: player        # Active player # TODO backup active player on pause
     type: bool
-    restore_value: no # fix
+    restore_value: no
     initial_value: "false"
-  - id: bright
+  - id: bright        # Display brightness 0-15
     type: int
     restore_value: no
-    initial_value: '3' # 0-15
-  - id: p1 # left player
-    type: int
-    restore_value: no
-    initial_value: "0"
-  - id: p2 # right player
+    initial_value: '3'
+  - id: p1            # Left player time left
     type: int
     restore_value: no
     initial_value: "0"
-  - id: preset
+  - id: p2            # Right player time left
+    type: int
+    restore_value: no
+    initial_value: "0"
+  - id: preset        # Initial game time
     type: int
     restore_value: no
     initial_value: "36000" # in 100ms -> 3600 * 10 = 1h
-  - id: gtimer
+  - id: gtimer        # Total game time # TODO restore game time, but don't write to RAM every 100ms, maybe on pause
     type: int
-    restore_value: no # TODO restore playtime, but don't write to RAM every 100ms, maybe on pause
+    restore_value: no 
     initial_value: "0"
-  - id: indicator
+  - id: indicator     # Display "-" indicator true/false
     type: bool
     restore_value: no
     initial_value: "false"
-  - id: startup
+  - id: startup       # Display "-" if time not valid yet
     type: int
     restore_value: no
     initial_value: "1"
-  - id: settings
+  - id: settings      # Display settings true/false
     type: bool
     restore_value: no
     initial_value: "false"
-  - id: increment
+  - id: increment     # Game time increment
     type: int
     restore_value: no
     initial_value: "3000"
-  - id: countdown
+  - id: countdown     # Countdown visible true/false
     type: bool
     restore_value: no
     initial_value: "false"
-  - id: cdvalue
+  - id: cdvalue       # Countdown value # TODO cdvalue change to static instead of global?
     type: int
     restore_value: no
     initial_value: "4"
-  - id: ended
+  - id: ended         # Game has ended true/false
     type: bool
     restore_value: no
     initial_value: "false"
-  - id: songplayed
+  - id: songplayed    # Game has ended song played true/false
     type: bool
     restore_value: no
     initial_value: "false"
-
-  - id: alarmsetting
+  - id: alarmsetting  # Alarm setting visible true/false
     type: bool
     restore_value: no
     initial_value: "false"
-  - id: alarminc
+  - id: alarminc      # Alarm minute/hour currently increasing true/false
     type: bool
     restore_value: no
     initial_value: "false"
-  - id: alarm
+  - id: alarm         # Alarm enabled true/false
     type: bool
     restore_value: yes
-    initial_value: "true"
-  - id: alarmhour
+    initial_value: "false"
+  - id: alarmhour     # Alarm hour setting # TODO Restore alarm hour
     type: int
     restore_value: no
     initial_value: "16"
-  - id: alarmminute
+  - id: alarmminute   # Alarm minute setting # TODO Restore alarm minute
     type: int
     restore_value: no
     initial_value: "51"
-  - id: alarmplayed
+  - id: alarmplayed   # Alarm song played true/false
     type: bool
     restore_value: no
     initial_value: "false"
@@ -250,27 +249,7 @@ time:
   timezone: Europe/Berlin
 
 interval:
-- interval: 100ms
-  then:
-  - if:
-      condition:
-        lambda: |-
-          return id(alarminc);
-      then:
-      - lambda: |-
-          if (id(alarmminute) < 59) {
-            id(alarmminute) += 1;
-          } else {
-            id(alarmminute) = 0;
-            if (id(alarmhour) < 23) {
-              id(alarmhour) += 1;
-            } else {
-              id(alarmhour) = 0;
-            }
-          }
-      - component.update: segments
-
-- interval: 1s
+- interval: 1s # Alarmclock Check & Alert
   then:
   - if:
       condition:
@@ -292,7 +271,7 @@ interval:
 #int _r = rand() % 10;
 #ESP_LOGD("main", "rand: %u", _r);
 
-- interval: 100ms
+- interval: 100ms # Player Timers
   then:
   - lambda: |-
       if (id(playing)) {
@@ -315,7 +294,25 @@ interval:
           id(segments).update();
         }
       }
-- interval: 1s
+  - if:
+      condition:
+        lambda: |-
+          return id(alarminc);
+      then:
+      - lambda: |-
+          if (id(alarmminute) < 59) {
+            id(alarmminute) += 1;
+          } else {
+            id(alarmminute) = 0;
+            if (id(alarmhour) < 23) {
+              id(alarmhour) += 1;
+            } else {
+              id(alarmhour) = 0;
+            }
+          }
+      - component.update: segments
+
+- interval: 1s # Game Timer, Countdown & End of Game Alert
   then:
   - lambda: |-
       if (id(playing)) {
@@ -366,7 +363,7 @@ interval:
         - lambda: 'id(songplayed) = true;'
 
 script:
-- id: dimmdown
+- id: dimmdown # Dimm Display every minute until brightness = 1
   then:
   - while:
       condition:
