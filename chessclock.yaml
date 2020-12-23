@@ -494,6 +494,7 @@ interval:
 
 script:
 - id: dimmdown # Dimm Display every minute until brightness = 1
+  mode: restart
   then:
   - while:
       condition:
@@ -507,6 +508,7 @@ script:
             id(ring).turn_off();
           }
 - id: showactiveplayer
+  mode: single
   then:
   - lambda: |-
       if (!id(settings).state) {
@@ -522,6 +524,7 @@ script:
         id(indicator) = false;
       }
 - id: resetgame
+  mode: single
   then:
   - lambda: |-
       if (id(started)) {
