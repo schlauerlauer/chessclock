@@ -139,6 +139,7 @@ switch:
   pin: GPIO12
   name: "Button LED"
   id: ring
+  restore_mode: ALWAYS_ON
 
 rtttl:
 - output: buzzer
@@ -202,7 +203,7 @@ globals:
     type: bool
     restore_value: no
     initial_value: "false"
-  - id: cdvalue       # Countdown value # TODO cdvalue change to static instead of global?
+  - id: cdvalue       # Countdown value # TODO maybe change cdvalue to static instead of global?
     type: int
     restore_value: no
     initial_value: "4"
@@ -267,9 +268,6 @@ interval:
           return false;
       then:
       - rtttl.play: "alarm:d=10,o=7,b=120:c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c"
-
-#int _r = rand() % 10;
-#ESP_LOGD("main", "rand: %u", _r);
 
 - interval: 100ms # Player Timers
   then:
