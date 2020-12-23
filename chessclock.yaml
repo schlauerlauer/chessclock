@@ -1,0 +1,450 @@
+esphome:
+  name: chessclock
+  platform: ESP8266
+  board: esp_wroom_02
+  esp8266_restore_from_flash: yes
+
+logger:
+api:
+ota:
+
+wifi:
+  use_address: chessclock.local
+  reboot_timeout: 0s # disable reboot if no wifi connection is established
+  power_save_mode: HIGH
+  networks:
+  - ssid: !secret wifi_id
+    password: !secret wifi_pw
+  - ssid: !secret wifi_b_id
+    password: !secret wifi_b_pw
+
+binary_sensor:
+- platform: gpio
+  pin:
+    number: GPIO5
+    mode: INPUT_PULLUP
+    inverted: yes
+  name: "Chess Toggle"
+  id: p_switch
+  on_press:
+    then:
+    - script.stop: dimmdown
+    - lambda: |-
+        if (!id(settings)) {
+          if (id(playing)) {
+            id(player) = !id(player);
+          } else {
+            if (!id(started)) id(player) = !id(player);
+            id(bright) = 10;
+            id(indicator) = true;
+          }
+        } else {
+          if (!id(alarmsetting)) {
+            int _val = id(p1);
+            if (_val > 108000) {
+              _val = 0;
+            }
+            _val += id(increment);
+            id(p1) = _val;
+            id(p2) = _val;
+          }
+        }
+        id(ring).turn_on();
+        if (id(alarmsetting)) {
+          id(alarminc) = true;
+        }
+    - component.update: segments
+    - delay: !lambda "if (id(playing)) return 0; else return 1000;"
+    - lambda: |-
+        if (!id(playing)) {
+          id(bright) = 3;
+          id(indicator) = false;
+        }
+    - script.execute: dimmdown
+    - if:
+        condition:
+          rtttl.is_playing
+        then:
+        - rtttl.stop
+
+  on_release:
+    then:
+    - lambda: |-
+        id(alarminc) = false;
+    
+  on_double_click:
+    then:
+    - script.stop: dimmdown
+    - lambda: |-
+        if (!id(settings)) {
+          if (!id(started)) {
+            id(p1) = id(preset);
+            id(p2) = id(preset);
+          }
+          if (id(playing)) {
+            id(countdown) = false;
+            id(playing) = false;
+            id(bright) = 3;
+          } else {
+            id(countdown) = true;
+            id(started) = true;
+            id(bright) = 10;
+            id(indicator) = true;
+          }
+        } else {
+          if (!id(alarmsetting)) {
+            id(p1) -= id(increment) * 2;
+            id(p2) -= id(increment) * 2;
+          }
+          id(alarmsetting) = !id(alarmsetting);
+        }
+  on_click:
+  - min_length: 1s
+    max_length: 4s
+    then:
+    - lambda: |-
+        if (id(started)) {
+          id(playing) = false;
+          id(started) = false;
+          id(indicator) = false;
+          id(ended) = false;
+          id(p1) = id(preset);
+          id(p2) = id(preset);
+          id(gtimer) = 0;
+          id(bright) = 3;
+          id(songplayed) = false;
+        } else {
+          if (id(settings)) {
+            id(preset) = id(p1) - id(increment);
+          }
+          if (!id(alarmsetting)) {
+            id(p1) = id(preset);
+            id(p2) = id(preset);
+            id(settings) = !id(settings);
+          }
+        }
+        id(player) = !id(player);
+  - min_length: 4s
+    max_length: 7s
+    then:
+    - if:
+        condition:
+          lambda: |-
+            return !id(alarmsetting);
+        then:
+        - lambda: 'id(alarm) = !id(alarm);'
+
+switch:
+- platform: gpio
+  pin: GPIO12
+  name: "Button LED"
+  id: ring
+
+rtttl:
+- output: buzzer
+  id: sound
+
+output:
+- platform: esp8266_pwm
+  pin: GPIO4
+  id: buzzer
+
+globals:
+  - id: playing # not paused
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: started # game in progress (playing or paused)
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: player
+    type: bool
+    restore_value: no # fix
+    initial_value: "false"
+  - id: bright
+    type: int
+    restore_value: no
+    initial_value: '3' # 0-15
+  - id: p1 # left player
+    type: int
+    restore_value: no
+    initial_value: "0"
+  - id: p2 # right player
+    type: int
+    restore_value: no
+    initial_value: "0"
+  - id: preset
+    type: int
+    restore_value: no
+    initial_value: "36000" # in 100ms -> 3600 * 10 = 1h
+  - id: gtimer
+    type: int
+    restore_value: no # TODO restore playtime, but don't write to RAM every 100ms, maybe on pause
+    initial_value: "0"
+  - id: indicator
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: startup
+    type: int
+    restore_value: no
+    initial_value: "1"
+  - id: settings
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: increment
+    type: int
+    restore_value: no
+    initial_value: "3000"
+  - id: countdown
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: cdvalue
+    type: int
+    restore_value: no
+    initial_value: "4"
+  - id: ended
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: songplayed
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+  - id: alarmsetting
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: alarminc
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: alarm
+    type: bool
+    restore_value: yes
+    initial_value: "true"
+  - id: alarmhour
+    type: int
+    restore_value: no
+    initial_value: "16"
+  - id: alarmminute
+    type: int
+    restore_value: no
+    initial_value: "51"
+  - id: alarmplayed
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+spi:
+  clk_pin: GPIO14
+  mosi_pin: GPIO13
+
+time:
+- platform: sntp
+  id: sntp_time
+  timezone: Europe/Berlin
+
+interval:
+- interval: 100ms
+  then:
+  - if:
+      condition:
+        lambda: |-
+          return id(alarminc);
+      then:
+      - lambda: |-
+          if (id(alarmminute) < 59) {
+            id(alarmminute) += 1;
+          } else {
+            id(alarmminute) = 0;
+            if (id(alarmhour) < 23) {
+              id(alarmhour) += 1;
+            } else {
+              id(alarmhour) = 0;
+            }
+          }
+      - component.update: segments
+
+- interval: 1s
+  then:
+  - if:
+      condition:
+        lambda: |-
+          if (id(alarm) && id(sntp_time).now().is_valid()) {
+            if (id(sntp_time).now().hour == id(alarmhour)) {
+              if (id(sntp_time).now().minute == id(alarmminute)) {
+                if (!id(alarmplayed)) {
+                  id(alarmplayed) = true;
+                  return true;
+                }
+              } else id(alarmplayed) = false;
+            }
+          }
+          return false;
+      then:
+      - rtttl.play: "alarm:d=10,o=7,b=120:c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c"
+
+#int _r = rand() % 10;
+#ESP_LOGD("main", "rand: %u", _r);
+
+- interval: 100ms
+  then:
+  - lambda: |-
+      if (id(playing)) {
+        int _p1, _p2;
+        _p1 = id(p1);
+        _p2 = id(p2);
+        if (_p1 > 0 && _p2 > 0) {
+          if (id(player)) {
+            id(p2) -= 1;
+          } else {
+            id(p1) -= 1;
+          }
+        } else {
+          id(playing) = false;
+          id(indicator) = true;
+          id(bright) = 15;
+          id(ended) = true;
+        }
+        if (_p1 < 6000 || _p2 < 6000) {
+          id(segments).update();
+        }
+      }
+- interval: 1s
+  then:
+  - lambda: |-
+      if (id(playing)) {
+        id(gtimer) += 1;
+      } else {
+        if (id(started)) id(indicator) = !id(indicator);
+      }
+      if (id(countdown)) {
+        id(bright) = 10;
+        if (id(cdvalue) > 1) {
+          id(cdvalue) -= 1;
+        }
+        else {
+          id(cdvalue) = 4;
+          id(countdown) = false;
+          id(playing) = true;
+        }
+      }
+      if (id(started) && id(playing)) id(indicator) = true;
+      if (id(ended)) {
+        if (id(indicator)) {
+          id(bright) = 15;
+        } else {
+          id(bright) = 1;
+        }
+      }
+  - if:
+      condition:
+        and:
+        - lambda: 'return id(ended);'
+        - lambda: 'return !id(songplayed);'
+      then:
+        - if:
+            condition:
+            - lambda: |-
+                return (id(sntp_time).now().month == 12 && id(sntp_time).now().day_of_month == 24);
+            then:
+            - rtttl.play: 'christmas:d=4,o=5,b=200:d,g,8g,8a,8g,8f#,e,e,e,a,8a,8b,8a,8g,f#,d,d,b,8b,8c6,8b,8a,g,e,d,e,a,f#,2g,d,g,8g,8a,8g,8f#,e,e,e,a,8a,8b,8a,8g,f#,d,d,b,8b,8c6,8b,8a,g,e,d,e,a,f#,1g,d,g,g,g,2f#,f#,g,f#,e,2d,a,b,8a,8a,8g,8g,d6,d,d,e,a,f#,2g'
+            else:
+            - if:
+                condition:
+                - lambda: |-
+                    return (id(sntp_time).now().month == 9 && id(sntp_time).now().day_of_month == 8);
+                then:
+                - rtttl.play: 'birthday:d=4,o=5,b=125:8d,8d,e,d,g,2f#,8d,8d,e,d,a,2g,8d,8d,d6,b,g,2f#,e,8c6,8c6,b,g,a,g,p'
+                else:
+                - rtttl.play: "smbdeath:d=4,o=5,b=90:32c6,32c6,32c6,8p,16b,16f6,16p,16f6,16f.6,16e.6,16d6,16c6,16p,16e,16p,16c"
+        - lambda: 'id(songplayed) = true;'
+
+script:
+- id: dimmdown
+  then:
+  - while:
+      condition:
+        lambda: |-
+          return id(bright) > 1;
+      then:
+      - delay: 1min
+      - lambda: |-
+          id(bright) -= 1;
+          if (id(bright) == 1) {
+            id(ring).turn_off();
+          }
+
+display:
+  - platform: max7219
+    id: segments
+    cs_pin: GPIO15
+    num_chips: 2
+    lambda: |-
+      it.set_intensity(id(bright));
+      if (id(bright) != 0) {
+        if (id(indicator)) {
+          int _pos = id(player) * 7;
+          it.print(_pos, "-");
+        }
+        if (id(alarm)) it.print(7, ".");
+        if (id(started) || (id(settings))) {
+          int _s1, _p1s, _p1m, _s2, _p2s, _p2m;
+          _s1 = id(p1);
+          _p1m = _s1/600;
+          _p1s = _s1/10-(_p1m*60);
+          _s2 = id(p2);
+          _p2m = _s2/600;
+          _p2s = _s2/10-(_p2m*60);
+          
+          if (!id(alarmsetting)) {
+            if (_p1m < 10) {
+              int _p1c = _s1-(_p1m*60+_p1s)*10;
+              it.printf(8, "%1d.%02d.%1d", _p1m, _p1s, _p1c);
+            } else if (_p1m > 99) {
+              it.printf(8, "%03d", _p1m);
+            } else it.printf(8,  "%02d.%02d", _p1m, _p1s);
+            
+            if (_p2m < 10) {
+              int _p2c = _s2-(_p2m*60+_p2s)*10;
+              it.printf(12, "%1d.%02d.%1d", _p2m, _p2s, _p2c);
+            } else if (_p2m > 99) {
+              it.printf(12, "%03d", _p2m);
+            } else it.printf(12, "%02d.%02d", _p2m, _p2s);
+          }
+
+          if (!id(settings) && !id(countdown)) {
+            int _g, _gs, _gm, _gh;
+            _g = id(gtimer);
+            _gh = _g/3600;
+            _gm = (_g-(_gh*3600))/60;
+            _gs = _g-(_gh*3600)-(_gm*60);
+            it.printf(1,"%02d.%02d.%02d", _gh, _gm, _gs);
+          } else if (id(countdown)) {
+            int _pos = 1 + id(player) * 5;
+            it.printf(_pos,"%1d", id(cdvalue));
+          } else {
+            if (!id(alarmsetting)) {
+              it.printf(1, "SCHACH");
+            } else {
+              it.print(1, "uhr");
+              it.printf(10, "%02d.%02d", id(alarmhour), id(alarmminute));
+            }
+          }
+        } else {
+          if (id(sntp_time).now().is_valid()) {
+            it.strftime(1,"%H.%M.%S", id(sntp_time).now());
+            it.strftime(8,"%d.%m.%Y", id(sntp_time).now());
+          } else {
+            it.print(id(startup),"-");
+            it.print(id(startup)+8,"-");
+            if (id(startup) < 6) id(startup)+=1;
+            else id(startup) = 1;
+          }
+        }
+      }
