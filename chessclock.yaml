@@ -305,8 +305,8 @@ globals:
     initial_value: "0"
   - id: preset        # Initial game time
     type: int
-    restore_value: no
-    initial_value: "18000" # in 100ms -> 3600 * 10 = 1h
+    restore_value: yes
+    initial_value: "3000" # in 100ms -> 3600 * 10 = 1h
   - id: gtimer        # Total game time
     type: int
     restore_value: no 
