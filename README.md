@@ -14,9 +14,19 @@ With integrated time over WiFi and alarm clock.
 
 ```mermaid
 graph TD
-    A[Clock] -->|Single| B(Switch Player)
-    A -->|Double| C[Chess playing]
-    C -->|Single| B
-    C -->|Double| D[Paused]
-    D -->|Double| C
+    A{Clock} -->|Single| B(Switch Player)
+    A -->|Double| C
+    C{Chess playing} -->|Single| B
+    C -->|Hold 1s| A
+    C -->|Double| D
+    D{Paused} -->|Double| C
+    D -->|Hold 1s| A
+    F{From Anywhere} -->|Hold 4s| E(Toggle Alarm)
+    F -->|Single| U(Stop alarm sound)
+    A -->|Hold 1s| G
+    G{Settings} -->|Single| H(Increase Chess time)
+    G -->|Double| I{Set alarm time}
+    I -->|Hold| K(Increase alarm time)
+    I -->|Double| G
+    G -->|Hold 1s| A
 ```
