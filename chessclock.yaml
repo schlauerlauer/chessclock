@@ -3,6 +3,11 @@ esphome:
   platform: ESP8266
   board: esp_wroom_02
   esp8266_restore_from_flash: yes
+  on_boot:
+    then:
+    - lambda: |-
+        id(alarmhourtmp) = id(alarmhour);
+        id(alarmminutetmp) = id(alarmminute);
 
 logger:
 api:
@@ -13,10 +18,14 @@ wifi:
   reboot_timeout: 0s # disable reboot if no wifi connection is established
   power_save_mode: HIGH
   networks:
-  - ssid: !secret wifi_id
-    password: !secret wifi_pw
+  - ssid: !secret wifi_j_id
+    password: !secret wifi_j_pw
   - ssid: !secret wifi_b_id
     password: !secret wifi_b_pw
+  - ssid: !secret wifi_m_id
+    password: !secret wifi_m_pw
+  - ssid: !secret wifi_id
+    password: !secret wifi_pw
 
 binary_sensor:
 - platform: gpio
@@ -42,7 +51,7 @@ binary_sensor:
         } else {
           if (!id(alarmsetting).state) {
             int _val = id(p1);
-            if (_val > 108000) {
+            if (_val > 36000) {
               _val = 0;
             }
             _val += id(increment);
@@ -387,7 +396,29 @@ interval:
           }
           return false;
       then:
-      - rtttl.play: "alarm:d=10,o=7,b=120:c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c"
+      - if:
+          condition:
+          - lambda: |-
+              return (id(sntp_time).now().month == 12 && id(sntp_time).now().day_of_month == 24);
+          then:
+          - rtttl.play: 'christmas:d=4,o=5,b=200:d,g,8g,8a,8g,8f#,e,e,e,a,8a,8b,8a,8g,f#,d,d,b,8b,8c6,8b,8a,g,e,d,e,a,f#,2g,d,g,8g,8a,8g,8f#,e,e,e,a,8a,8b,8a,8g,f#,d,d,b,8b,8c6,8b,8a,g,e,d,e,a,f#,1g,d,g,g,g,2f#,f#,g,f#,e,2d,a,b,8a,8a,8g,8g,d6,d,d,e,a,f#,2g'
+          else:
+          - if:
+              condition:
+              - lambda: |-
+                  return (id(sntp_time).now().month == 9 && id(sntp_time).now().day_of_month == 8);
+              then:
+              - rtttl.play: 'birthday:d=4,o=5,b=125:8d,8d,e,d,g,2f#,8d,8d,e,d,a,2g,8d,8d,d6,b,g,2f#,e,8c6,8c6,b,g,a,g,p'
+              else:
+              - if:
+                  condition:
+                  - lambda: |-
+                      return (id(sntp_time).now().month == 5 && id(sntp_time).now().day_of_month == 4);
+                  then:
+                  - rtttl.play: 'starwars:d=4,o=5,b=180:8f,8f,8f,2a#.,2f.6,8d#6,8d6,8c6,2a#.6,f.6,8d#6,8d6,8c6,2a#.6,f.6,8d#6,8d6,8d#6,2c6,p,8f,8f,8f,2a#.,2f.6,8d#6,8d6,8c6,2a#.6,f.6,8d#6,8d6,8c6,2a#.6,f.6,8d#6,8d6,8d#6,2c6'
+                  else:
+                  - rtttl.play: "Bond:d=4,o=6,b=112:16c.5,32d.5,32d.5,16d.5,8d.5,16c.5,16c.5,16c.5,16c.5,32d#.5,32d#.5,16d#.5,8d#.5,16d.5,16d.5,16d.5,16c.5,32d.5,32d.5,16d.5,8d.5,16c.5,16c.5,16c.5,16c.5,32d#.5,32d#.5,16d#.5,8d#.5,16d.5,16d.5,16d.5,16c.5,32d.5,32d.5,16d.5,8d.5,16c.5,16c.5,16c.5,16c.5,32d#.5,32d#.5,16d#.5,8d#.5,16d.5,16d.5,16c.5,16b.5,2a#5,16g.5,16f.5,2g.5"
+                  #- rtttl.play: "alarm:d=10,o=7,b=90:c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,c,p,c,pc,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c,p,c"
 
 - interval: 100ms # Player Timers
   then:
@@ -412,6 +443,9 @@ interval:
           id(segments).update();
         }
       }
+
+- interval: 50ms
+  then:
   - if:
       condition:
         switch.is_on: alarminc
@@ -489,7 +523,15 @@ interval:
                 then:
                 - rtttl.play: 'birthday:d=4,o=5,b=125:8d,8d,e,d,g,2f#,8d,8d,e,d,a,2g,8d,8d,d6,b,g,2f#,e,8c6,8c6,b,g,a,g,p'
                 else:
-                - rtttl.play: "smbdeath:d=4,o=5,b=90:32c6,32c6,32c6,8p,16b,16f6,16p,16f6,16f.6,16e.6,16d6,16c6,16p,16e,16p,16c"
+                - if:
+                    condition:
+                    - lambda: |-
+                        return (id(sntp_time).now().month == 5 && id(sntp_time).now().day_of_month == 4);
+                    then:
+                    - rtttl.play: 'starwars:d=4,o=5,b=180:8f,8f,8f,2a#.,2f.6,8d#6,8d6,8c6,2a#.6,f.6,8d#6,8d6,8c6,2a#.6,f.6,8d#6,8d6,8d#6,2c6,p,8f,8f,8f,2a#.,2f.6,8d#6,8d6,8c6,2a#.6,f.6,8d#6,8d6,8c6,2a#.6,f.6,8d#6,8d6,8d#6,2c6'
+                    else:
+                    - rtttl.play: "MadeForL:d=4,o=6,b=140:a5,b5,c,8d,e,8e,d,c,b5,a5,b5,c,8d,e,8e,2d,p,a5,b5,c,8d,e,8e,d,c,b5,a5,b5,c,8d,e,8e,2d,p,8e,8d,8e,d,8c,8d,8e,8g,e.,2p,8e,8d,8e,d,8c,8d,8e,8g,e.,p,8e,e,e.,8d,d.,p,8d,e,d.,8c,c"
+                    #- rtttl.play: "smbdeath:d=4,o=5,b=90:32c6,32c6,32c6,8p,16b,16f6,16p,16f6,16f.6,16e.6,16d6,16c6,16p,16e,16p,16c"
         - lambda: 'id(songplayed) = true;'
 
 script:
