@@ -13,7 +13,7 @@ With integrated time over WiFi and alarm clock.
 
 ## How to
 
-[correct graph on gitlab](http://gitlab.com/schlauerlauer/chessclock)
+[graph only works in gitlab](http://gitlab.com/schlauerlauer/chessclock)
 
 ```mermaid
 graph TD
@@ -38,9 +38,9 @@ graph TD
 
 ### Finished Version
 
-> Warning: with sound
+> Warning: With sound. Only works in [gitlab](https://gitlab.com/schlauerlauer/chessclock))
 
-![countdown](media/video.mp4)
+![countdown video](media/video.mp4)
 
 ### Build
 
