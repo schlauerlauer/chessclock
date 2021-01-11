@@ -30,3 +30,27 @@ graph TD
     I -->|Double| G
     G -->|Hold 1s| A
 ```
+
+## Images
+
+### Finished Version
+
+![finished version](images/3.jpg)
+
+### Build
+
+![prototype 1](images/1.jpg)
+
+> first prototype
+
+![case](images/4.jpg)
+
+> planning the case
+
+![case 2](images/5.jpg)
+
+> building the case
+
+![build 1](images/2.jpg)
+
+> final programming
