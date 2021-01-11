@@ -38,7 +38,9 @@ graph TD
 
 ### Finished Version
 
-![finished version](media/video.mp4)
+> Warning: with sound
+
+![countdown](media/video.mp4)
 
 ### Build
 
