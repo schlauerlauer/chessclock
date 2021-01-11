@@ -1,16 +1,19 @@
 # chessclock
 
+
 A clock for timing chess games.
 With integrated time over WiFi and alarm clock.
 
 ## Features
 
-- Show current time (over WiFi with NTP)
-- Set chess game time
-- Set alarm time
-- ...
+- Show current time and date (over WiFi with NTP)
+- Time a chessgame
+- Wake up alarm
+- 18650 Battery
 
 ## How to
+
+[correct graph on gitlab](http://gitlab.com/schlauerlauer/chessclock)
 
 ```mermaid
 graph TD
@@ -31,26 +34,31 @@ graph TD
     G -->|Hold 1s| A
 ```
 
-## Images
+## Media
 
 ### Finished Version
 
-![finished version](images/3.jpg)
+![finished version](media/video.mp4)
 
 ### Build
 
-![prototype 1](images/1.jpg)
-
+> ![prototype 1](media/1.jpg)
+>
 > first prototype
 
-![case](images/4.jpg)
-
+> ![case](media/4.jpg)
+>
 > planning the case
 
-![case 2](images/5.jpg)
-
+> ![case 2](media/5.jpg)
+>
 > building the case
 
-![build 1](images/2.jpg)
-
+> ![build 1](media/2.jpg)
+>
 > final programming
+
+> ![case 3](media/6.jpg)
+> ![case 4](media/7.jpg)
+>
+> final case
