@@ -38,6 +38,11 @@ graph TD
 
 ### Finished Version
 
+![1](media/01.jpeg)
+![2](media/02.jpeg)
+![3](media/03.jpeg)
+![4](media/04.jpeg)
+
 > Warning: With sound. Only works in [gitlab](https://gitlab.com/schlauerlauer/chessclock))
 
 ![countdown video](media/video.mp4)
