@@ -49,23 +49,9 @@ graph TD
 
 ### Build
 
-> ![prototype 1](media/1.jpg)
->
-> first prototype
-
-> ![case](media/4.jpg)
->
-> planning the case
-
-> ![case 2](media/5.jpg)
->
-> building the case
-
-> ![build 1](media/2.jpg)
->
-> final programming
-
-> ![case 3](media/6.jpg)
-> ![case 4](media/7.jpg)
->
-> final case
+![prototype 1](media/1.jpg)
+![case](media/4.jpg)
+![case 2](media/5.jpg)
+![build 1](media/2.jpg)
+![case 3](media/6.jpg)
+![case 4](media/7.jpg)
